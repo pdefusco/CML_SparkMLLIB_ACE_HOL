@@ -1,0 +1,10 @@
+R
+node_modules
+*.pyc
+__pycache__
+.*
+!.gitignore1_LC_Data_Exploration.ipynb
+.gitignore
+data/
+default_data/
+resources/
