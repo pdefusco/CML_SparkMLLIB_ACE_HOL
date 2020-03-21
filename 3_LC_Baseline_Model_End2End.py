@@ -32,6 +32,8 @@ spark = SparkSession\
     .config("spark.executor.memory","2g")\
     .config("spark.executor.cores","8")\
     .config("spark.driver.memory","2g")\
+    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")\
+    .config("spark.yarn.access.hadoopFileSystems","s3a://cdp-cldr-virginia/")\
     .getOrCreate()
 
 def vectorizerFunction(dataInput, TargetFieldName):
@@ -173,3 +175,5 @@ temp = pd.DataFrame(temp.probability.apply(pd.Series).join(temp, how='inner'))
 temp.columns = ['prob0', 'prob1', 'label', 'probability']
 temp = temp.drop(columns=['prob0', 'probability'])
 temp.to_csv("data/baseline/predictions/label_vs_pred.csv")
+
+lrModel.save(sc, "s3a://cdp-cldr-virginia/cdp-cldr-virginia-dl/data/lc_demo")

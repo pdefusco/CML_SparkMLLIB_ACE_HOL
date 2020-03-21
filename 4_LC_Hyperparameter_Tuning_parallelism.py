@@ -19,7 +19,12 @@ import matplotlib.pyplot as plt
 
 spark = SparkSession\
     .builder\
-    .appName("LC_Hyperparameter_Tuning")\
+    .appName("LC_Baseline_Model")\
+    .config("spark.executor.memory","2g")\
+    .config("spark.executor.cores","8")\
+    .config("spark.driver.memory","2g")\
+    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")\
+    .config("spark.yarn.access.hadoopFileSystems","s3a://cdp-cldr-virginia/")\
     .getOrCreate()
 
 #Loading the data
