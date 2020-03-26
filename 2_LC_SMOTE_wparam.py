@@ -81,7 +81,6 @@ remove = ['addr_state', 'earliest_cr_line', 'home_ownership', 'initial_list_stat
           'loan_status', 'purpose', 'sub_grade', 'term', 'title', 'zip_code', 'application_type']
 df = df.drop(*remove)
 
-df = df.limit(100)
 
 cat_cols = [item[0] for item in df.dtypes if item[1].startswith('string')]
 num_cols = [item[0] for item in df.dtypes if item[1].startswith('in') or item[1].startswith('dou')]
