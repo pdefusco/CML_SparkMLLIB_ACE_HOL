@@ -20,13 +20,14 @@ import sys
 spark = SparkSession\
     .builder\
     .appName("LC_Baseline_Model")\
-    .config("spark.executor.memory","2g")\
-    .config("spark.executor.cores","8")\
-    .config("spark.driver.memory","2g")\
     .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")\
-    .config("spark.yarn.access.hadoopFileSystems","s3a://cdp-cldr-virginia/")\
+    .config("spark.yarn.access.hadoopFileSystems","s3a://demo-aws-1/")\
     .getOrCreate()
-    
+
+#.config("spark.executor.memory","2g")\
+#.config("spark.executor.cores","8")\
+#.config("spark.driver.memory","2g")\
+
 def vectorizerFunction(dataInput, TargetFieldName):
     if(dataInput.select(TargetFieldName).distinct().count() != 2):
         raise ValueError("Target field must have only 2 distinct classes")
@@ -74,11 +75,13 @@ def SmoteSampling(vectorized, k = 5, minorityClass = 1, majorityClass = 0, perce
     new_data_major = dataInput_maj.sample(False, (float(percentageUnder)/float(100)))
     return new_data_major.unionAll(new_data_minor)
     
-df = spark.sql("SELECT * FROM default.lc_table")
+df = spark.sql("SELECT * FROM default.LC_Table")
 
 remove = ['addr_state', 'earliest_cr_line', 'home_ownership', 'initial_list_status', 'issue_d', 'emp_length',
           'loan_status', 'purpose', 'sub_grade', 'term', 'title', 'zip_code', 'application_type']
 df = df.drop(*remove)
+
+df = df.limit(100)
 
 cat_cols = [item[0] for item in df.dtypes if item[1].startswith('string')]
 num_cols = [item[0] for item in df.dtypes if item[1].startswith('in') or item[1].startswith('dou')]
@@ -87,7 +90,6 @@ num_features, cat_features = num_cols, cat_cols
 
 df = df.dropna()
 df = df.select(num_features)
-
 
 #Creates a Pipeline Object including One Hot Encoding of Categorical Features  
 def make_pipeline_numeric(spark_df):        
@@ -121,11 +123,15 @@ k = int(args[1])
 
 df_smote = SmoteSampling(vectorizerFunction(df_pre_smote, 'is_default'), k = k, minorityClass = 1, majorityClass = 0, percentageOver = 400, percentageUnder = 100)
 
-df_smote\
+df_smote_table = df_smote.rdd.map(lambda x:[float(y) for y in x['features']]).toDF()
+
+table_name = 'default.LC_Smote_k' + str(k)
+
+df_smote_table\
   .write.format("parquet")\
   .mode("overwrite")\
   .saveAsTable(
-    'default.lc_smote'
+    table_name
 )
 
 cdsw.track_metric("SMOTE New Row Count", df_smote.count())

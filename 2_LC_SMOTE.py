@@ -23,7 +23,7 @@ spark = SparkSession\
     .config("spark.executor.cores","8")\
     .config("spark.driver.memory","2g")\
     .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")\
-    .config("spark.yarn.access.hadoopFileSystems","s3a://cdp-cldr-virginia/")\
+    .config("spark.yarn.access.hadoopFileSystems","s3a://demo-aws-1/")\
     .getOrCreate()
     
 def vectorizerFunction(dataInput, TargetFieldName):
@@ -88,7 +88,6 @@ num_features, cat_features = num_cols, cat_cols
 df = df.dropna()
 df = df.select(num_features)
 
-
 #Creates a Pipeline Object including One Hot Encoding of Categorical Features  
 def make_pipeline_numeric(spark_df):        
     stages= []
@@ -122,7 +121,7 @@ df_smote\
   .write.format("parquet")\
   .mode("overwrite")\
   .saveAsTable(
-    'default.lc_smote'
+    'default.lc_smote_complete'
 )
 
 import cdsw
