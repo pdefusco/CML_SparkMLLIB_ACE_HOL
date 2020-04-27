@@ -1,4 +1,25 @@
-!pip3 install scikit-learn
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+get_ipython().system('pip3 install sklearn')
+
+
+# In[2]:
+
+
+import random
+import numpy as np
+from pyspark.sql import Row
+from sklearn import neighbors
+from pyspark.ml.feature import VectorAssembler
+from pyspark.mllib.stat import Statistics
+
+
+# In[3]:
+
 
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from pyspark.ml.classification import LogisticRegression
@@ -8,24 +29,34 @@ from pyspark.ml import Pipeline
 from pyspark.mllib.stat import Statistics
 from pyspark.ml.linalg import DenseVector
 from pyspark.sql import functions as F
-import random
-import numpy as np
-from pyspark.sql import Row
-from sklearn import neighbors
-from pyspark.ml.feature import VectorAssembler
+
+
+# In[4]:
+
+
 from pyspark.sql import SparkSession
 
 
-spark = SparkSession\
-    .builder\
-    .appName("LC_Baseline_Model")\
-    .config("spark.executor.memory","2g")\
-    .config("spark.executor.cores","8")\
-    .config("spark.driver.memory","2g")\
-    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")\
-    .config("spark.yarn.access.hadoopFileSystems","s3a://demo-aws-1/")\
-    .getOrCreate()
-    
+# In[5]:
+
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+# In[6]:
+
+
+spark = SparkSession    .builder    .appName("PythonSQL")    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")    .config("spark.yarn.access.hadoopFileSystems","s3a://demo-aws-2/")    .getOrCreate()
+    #.config("spark.executor.memory","2g")\
+    #.config("spark.executor.cores","8")\
+    #.config("spark.driver.memory","2g")\
+
+
+# In[7]:
+
+
 def vectorizerFunction(dataInput, TargetFieldName):
     if(dataInput.select(TargetFieldName).distinct().count() != 2):
         raise ValueError("Target field must have only 2 distinct classes")
@@ -36,7 +67,11 @@ def vectorizerFunction(dataInput, TargetFieldName):
     pos_vectorized = assembler.transform(dataInput)
     vectorized = pos_vectorized.select('features',TargetFieldName).withColumn('label',pos_vectorized[TargetFieldName]).drop(TargetFieldName)
     return vectorized
-    
+
+
+# In[8]:
+
+
 def SmoteSampling(vectorized, k = 5, minorityClass = 1, majorityClass = 0, percentageOver = 200, percentageUnder = 100):
     if(percentageUnder > 100|percentageUnder < 10):
         raise ValueError("Percentage Under must be in range 10 - 100");
@@ -72,58 +107,148 @@ def SmoteSampling(vectorized, k = 5, minorityClass = 1, majorityClass = 0, perce
     new_data_minor = dataInput_min.unionAll(new_data)
     new_data_major = dataInput_maj.sample(False, (float(percentageUnder)/float(100)))
     return new_data_major.unionAll(new_data_minor)
-    
-    
-df = spark.sql("SELECT * FROM default.lc_table")
+
+
+# In[9]:
+
+
+#df = spark.read.option('inferschema','true').csv('data/Data_Exploration.csv', header=True)
+
+
+# In[10]:
+
+
+df = spark.sql("SELECT * FROM default.LC_Table")
+
+
+# In[16]:
+
+
+#We remove categorical features that have too broad a set of values, or are highly imbalanced, or could cause data leakage.
+#We can elaborate and use them for feature extraction later, but they are not needed for a baseline
 
 remove = ['addr_state', 'earliest_cr_line', 'home_ownership', 'initial_list_status', 'issue_d', 'emp_length',
           'loan_status', 'purpose', 'sub_grade', 'term', 'title', 'zip_code', 'application_type']
 df = df.drop(*remove)
 
+# In[56]:
+
+
+#We will choose these features for our baseline model:
+#Creating list of categorical and numeric features
 cat_cols = [item[0] for item in df.dtypes if item[1].startswith('string')]
 num_cols = [item[0] for item in df.dtypes if item[1].startswith('in') or item[1].startswith('dou')]
-
 num_features, cat_features = num_cols, cat_cols
 
+
+# In[57]:
+
+
 df = df.dropna()
+
+
+# In[58]:
+
+
 df = df.select(num_features)
 
-#Creates a Pipeline Object including One Hot Encoding of Categorical Features  
-def make_pipeline_numeric(spark_df):        
+
+# Baseline Feature Exploration
+
+# In[23]:
+
+
+#Creates a Pipeline Object
+def make_pipeline_numeric(spark_df):
     stages= []
 
+    scale_cols = df.columns
+    scale_cols.remove('is_default')
+
     #Assembling mixed data type transformations:
-    assembler = VectorAssembler(inputCols=df.columns, outputCol="features")
+    assembler = VectorAssembler(inputCols=scale_cols, outputCol="features")
     stages += [assembler]
-    
+
     #Standard scaler
     scaler = StandardScaler(inputCol="features", outputCol="scaledFeatures",
                         withStd=True, withMean=True)
     stages += [scaler]
-    
-    #Creating and running the pipeline
+
+    #Creating and running the pipeline:
     pipeline = Pipeline(stages=stages)
     pipelineModel = pipeline.fit(spark_df)
     out_df = pipelineModel.transform(spark_df)
-    
+
     return out_df
-    
-    
+
+
+# In[24]:
+
+
 df_model = make_pipeline_numeric(df)
+
+
+# In[25]:
+
 
 input_data = df_model.rdd.map(lambda x: (x["is_default"], DenseVector(x["scaledFeatures"])))
 
+
+# In[26]:
+
+
 df_pre_smote = spark.createDataFrame(input_data, ["is_default", "scaledFeatures"])
 
-df_smote = SmoteSampling(vectorizerFunction(df_pre_smote, 'is_default'), k = 2, minorityClass = 1, majorityClass = 0, percentageOver = 400, percentageUnder = 100)
 
-df_smote\
-  .write.format("parquet")\
-  .mode("overwrite")\
-  .saveAsTable(
-    'default.lc_smote_complete'
+# In[27]:
+
+
+#scaledData = scaledData.drop("features")
+
+
+# In[29]:
+
+
+df_smote = SmoteSampling(vectorizerFunction(df_pre_smote, 'is_default'), k = 3, minorityClass = 1, majorityClass = 0, percentageOver = 400, percentageUnder = 100)
+
+
+
+# In[32]:
+
+
+df_out = df_smote.groupby("label").count().toPandas()
+
+
+
+# In[34]:
+
+
+df_pre = df_pre_smote.groupby("is_default").count().toPandas()
+df_post = df_smote.groupby("label").count().toPandas()
+
+
+# In[61]:
+
+
+def extract(row):
+    return tuple(row.features.toArray().tolist()) + (row.label, )
+
+
+# In[62]:
+
+
+df_smote_table = df_smote.rdd.map(extract).toDF(df.columns)
+
+
+# In[66]:
+
+
+df_smote_table  .write.format("parquet")  .mode("overwrite")  .saveAsTable(
+    'default.lc_smote_all'
 )
 
+
+#Additions for experiments:
 import cdsw
 
 cdsw.track_metric("SMOTE New Row Count", df_smote.count())
