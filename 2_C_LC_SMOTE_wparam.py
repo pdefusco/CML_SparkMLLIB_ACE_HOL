@@ -10,7 +10,7 @@ get_ipython().system('pip3 install sklearn')
 # In[2]:
 
 
-import random
+import random, os
 import numpy as np
 from pyspark.sql import Row
 from sklearn import neighbors
@@ -24,38 +24,25 @@ from pyspark.mllib.stat import Statistics
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 from pyspark.ml.classification import LogisticRegression
 from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
-from pyspark.ml.feature import OneHotEncoderEstimator, StringIndexer, VectorAssembler, StandardScaler, Imputer
+from pyspark.ml.feature import StringIndexer, VectorAssembler, StandardScaler, Imputer
 from pyspark.ml import Pipeline
 from pyspark.mllib.stat import Statistics
 from pyspark.ml.linalg import DenseVector
 from pyspark.sql import functions as F
 
-
-# In[4]:
-
-
 from pyspark.sql import SparkSession
-
-
-# In[5]:
-
-
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-
-# In[6]:
-
-
-spark = SparkSession    .builder    .appName("PythonSQL")    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")    .config("spark.yarn.access.hadoopFileSystems","s3a://demo-aws-2/")    .getOrCreate()
+spark = SparkSession.builder\
+                    .appName("PythonSQL")\
+                    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-2")\
+                    .config("spark.yarn.access.hadoopFileSystems",os.environ["STORAGE"])\
+                    .getOrCreate()
     #.config("spark.executor.memory","2g")\
     #.config("spark.executor.cores","8")\
     #.config("spark.driver.memory","2g")\
-
-
-# In[7]:
-
 
 def vectorizerFunction(dataInput, TargetFieldName):
     if(dataInput.select(TargetFieldName).distinct().count() != 2):
@@ -67,10 +54,6 @@ def vectorizerFunction(dataInput, TargetFieldName):
     pos_vectorized = assembler.transform(dataInput)
     vectorized = pos_vectorized.select('features',TargetFieldName).withColumn('label',pos_vectorized[TargetFieldName]).drop(TargetFieldName)
     return vectorized
-
-
-# In[8]:
-
 
 def SmoteSampling(vectorized, k = 5, minorityClass = 1, majorityClass = 0, percentageOver = 200, percentageUnder = 100):
     if(percentageUnder > 100|percentageUnder < 10):
@@ -109,14 +92,7 @@ def SmoteSampling(vectorized, k = 5, minorityClass = 1, majorityClass = 0, perce
     return new_data_major.unionAll(new_data_minor)
 
 
-# In[9]:
-
-
 #df = spark.read.option('inferschema','true').csv('data/Data_Exploration.csv', header=True)
-
-
-# In[10]:
-
 
 df = spark.sql("SELECT * FROM default.LC_Table")
 
@@ -194,48 +170,24 @@ df_model = make_pipeline_numeric(df)
 input_data = df_model.rdd.map(lambda x: (x["is_default"], DenseVector(x["scaledFeatures"])))
 
 
+#New Addition
+args = sys.argv
+k = int(args[1])
+
 # In[26]:
 
-
 df_pre_smote = spark.createDataFrame(input_data, ["is_default", "scaledFeatures"])
-
-
-# In[27]:
-
-
-#scaledData = scaledData.drop("features")
-
 
 # In[29]:
 
 
 df_smote = SmoteSampling(vectorizerFunction(df_pre_smote, 'is_default'), k = 3, minorityClass = 1, majorityClass = 0, percentageOver = 400, percentageUnder = 100)
 
-
-
-# In[32]:
-
-
-df_out = df_smote.groupby("label").count().toPandas()
-
-
-
-# In[34]:
-
-
 df_pre = df_pre_smote.groupby("is_default").count().toPandas()
 df_post = df_smote.groupby("label").count().toPandas()
 
-
-# In[61]:
-
-
 def extract(row):
     return tuple(row.features.toArray().tolist()) + (row.label, )
-
-
-# In[62]:
-
 
 df_smote_table = df_smote.rdd.map(extract).toDF(df.columns)
 
@@ -243,8 +195,13 @@ df_smote_table = df_smote.rdd.map(extract).toDF(df.columns)
 # In[66]:
 
 
-df_smote_table  .write.format("parquet")  .mode("overwrite")  .saveAsTable(
-    'default.lc_smote_all'
+table_name = 'default.LC_Smote_K_' + str(k)
+
+df_smote_table\
+  .write.format("parquet")\
+  .mode("overwrite")\
+  .saveAsTable(
+    table_name
 )
 
 

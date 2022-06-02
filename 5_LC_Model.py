@@ -10,11 +10,11 @@ from pyspark.sql import SparkSession
 spark = SparkSession\
     .builder\
     .appName("PythonSQL")\
-    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")\
-    .config("spark.yarn.access.hadoopFileSystems","s3a://demo-aws-2/")\
+    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-2")\
+    .config("spark.yarn.access.hadoopFileSystems",os.environ["STORAGE"])\
     .getOrCreate()
     
-modelPipeline = PipelineModel.load("s3a://demo-aws-2/datalake/pdefusco/pipeline")
+modelPipeline = PipelineModel.load(os.environ["STORAGE"]+"/pdefusco/pipeline")
 
 from pyspark.sql.types import *
 

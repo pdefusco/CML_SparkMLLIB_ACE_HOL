@@ -1,18 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
-get_ipython().system('pip3 install handyspark')
-
-
-# In[2]:
-
-
-from handyspark import *
-
-
 # In[3]:
 
 
@@ -61,17 +49,12 @@ from pyspark.sql import SparkSession
 # In[8]:
 
 
-spark = SparkSession    .builder    .appName("LC_Baseline_Model")    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-1")    .config("spark.yarn.access.hadoopFileSystems","s3a://demo-aws-2/")    .getOrCreate()
+spark = SparkSession.builder.appName("LC_Baseline_Model")\
+                        .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-2")\
+                        .config("spark.yarn.access.hadoopFileSystems",os.environ["STORAGE"])\
+                        .getOrCreate()
 
-
-# In[44]:
-
-
-df = spark.sql("SELECT * FROM default.LC_Smote_K_3")
-
-
-# In[45]:
-
+df = spark.sql("SELECT * FROM default.lc_smote_subset")
 
 #Creating list of categorical and numeric features
 num_cols = [item[0] for item in df.dtypes if item[1].startswith('in') or item[1].startswith('dou')]
