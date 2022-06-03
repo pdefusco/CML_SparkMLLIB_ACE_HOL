@@ -14,3 +14,7 @@ urllib3
 Werkzeug==0.16.1
 seaborn
 sklearn
+onnxruntime
+onnxmltools
+onnx
+handyspark
