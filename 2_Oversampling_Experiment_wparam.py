@@ -35,11 +35,12 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-spark = SparkSession.builder\
-                    .appName("PythonSQL")\
-                    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-2")\
-                    .config("spark.yarn.access.hadoopFileSystems",os.environ["STORAGE"])\
-                    .getOrCreate()
+spark = SparkSession\
+    .builder\
+    .appName("SMOTE_Experiment")\
+    .config("spark.hadoop.fs.s3a.s3guard.ddb.region","us-east-2")\
+    .config("spark.yarn.access.hadoopFileSystems",os.environ["STORAGE"])\
+    .getOrCreate()
     #.config("spark.executor.memory","2g")\
     #.config("spark.executor.cores","8")\
     #.config("spark.driver.memory","2g")\

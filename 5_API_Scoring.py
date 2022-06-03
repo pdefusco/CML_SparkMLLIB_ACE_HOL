@@ -4,6 +4,7 @@ import onnxruntime
 import onnxmltools
 import onnx
 import json, shutil, os
+import cdsw
 
 ### Sample Input Data
 #input_data = {
@@ -14,7 +15,7 @@ import json, shutil, os
 #  "funded_amnt": "1"
 #}
 
-model_path = onnx.load("model.onnx").SerializeToString()
+model_path = onnx.load("models/model.onnx").SerializeToString()
 
 so = onnxruntime.SessionOptions()
 so.add_session_config_entry('model.onnx', 'ONNX')
@@ -22,7 +23,8 @@ so.add_session_config_entry('model.onnx', 'ONNX')
 session = onnxruntime.InferenceSession(model_path)
 output = session.get_outputs()[0] 
 inputs = session.get_inputs()
-    
+
+@cdsw.model_metrics
 def run(input_data):
     
     # Reformatting Input
@@ -39,9 +41,19 @@ def run(input_data):
         input_data= {i.name: v for i, v in zip(inputs, df.values.reshape(len(inputs),1,1).astype(np.float32))}
         output = session.run(None, input_data)
         pred = pd.DataFrame(output)[0][0]
-
-        #print('[INFO] Results was ' + json.dumps(pred))
-        return {"result": pred}
+        
+        #cdsw.track_metric("input_data", input_data)
+        cdsw.track_metric("prediction", pred)
+        
+        data = df.astype('str').to_dict('records')[0]
+    
+        # Track prediction
+        cdsw.track_metric("prediction", str(pred))
+    
+        cdsw.track_metric("data", df.to_json())
+    
+        return {'input_data': str(data), 'prediction': str(pred)}
+        
 
     except Exception as e:
         result_dict = {"error": str(e)}
