@@ -1,3 +1,3 @@
-# Marketing Campaign in PySpark
+# Credit Scoring with PySpark ML
 
-## Edit README as needed and it will show here automatically
+## 
