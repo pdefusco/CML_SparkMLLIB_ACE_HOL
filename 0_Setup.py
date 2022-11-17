@@ -95,5 +95,5 @@ except:
     os.environ["STORAGE"] = storage
     
 !hdfs dfs -mkdir $STORAGE/credit_demo
-!hdfs dfs -cp /home/cdsw/data/LoanStats_2015_subset_120321.csv $STORAGE/credit_demo/LoanStats_2015_subset_120321.csv
+!hdfs dfs -cp /home/cdsw/data/LoanStats_2015_original.csv $STORAGE/credit_demo/LoanStats_2015_original.csv
 !hdfs dfs -ls $STORAGE/credit_demo
