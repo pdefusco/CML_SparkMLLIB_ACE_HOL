@@ -10,4 +10,3 @@ sklearn
 onnxruntime
 onnxmltools
 onnx
-handyspark
